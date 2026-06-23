@@ -1,0 +1,569 @@
+{
+  "name": "AutomatedLeadAgent",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "FlowBridge",
+        "formDescription": "Write us what you would like to know and we'll get back to you!",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company Name"
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone Number",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Request",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        -32
+      ],
+      "id": "c36d1988-7eb5-4188-9846-6f91352db9ae",
+      "name": "On form submission",
+      "webhookId": "7cda8b23-265a-44e4-9bbb-da958833534a"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Here is a new lead to classify:\n\nName: {{ $json.Name }}\nCompany Name: {{ $json['Company Name'] }}\nEmail: {{ $json.Email }}\nRequest: {{ $json.Request }}\nPhone Number: {{ $json['Phone Number'] }}",
+        "options": {
+          "systemMessage": "# ROLE\nYou are a lead qualification specialist for FlowBridge, a B2B company that connects and automates businesses' software tools and workflows. You analyze incoming leads and classify each one by how valuable the opportunity is.\n\n# YOUR INPUT\nYou will receive a lead with these fields:\n- Name\n- Company Name (may be empty)\n- Email\n- Request (free text describing what the lead wants)\n-Phone Number\n\n# YOUR TASK\nRead the Request carefully and classify the lead as exactly one of: \"Hot\", \"Warm\", or \"Cold\".\nBase your decision on the signals in the Request, weighing:\n- Intent: how clearly they want to buy or engage, versus just browsing or asking a vague question.\n- Seriousness: how concrete and committed they sound.\n- Budget: any hint of money or willingness to spend (for example \"we have a budget of\", \"what does it cost\").\n- Urgency: any time pressure (for example \"as soon as possible\", \"by next month\").\n- Opportunity size: how large the work sounds. A small single task (for example \"connect our CRM to our email\") is a smaller opportunity than a broad one (for example \"automate our entire sales process\" or \"our whole business\").\n\n# CLASSIFICATION GUIDE\n- Hot: strong intent plus at least one strong signal of value (clear budget, urgency, or a large-scope project). These need attention immediately.\n- Warm: genuine interest but missing strong signals, for example a real request with no budget, urgency, or clear scope yet.\n- Cold: vague, low-intent, very small scope, or unclear messages that do not yet show real opportunity.\n# REPLY DRAFT\nAlso write a short, personalized reply to send to the lead. The reply must:\n- Acknowledge their specific request in your own words, so it is clear we read it.\n- Reassure them that FlowBridge handles exactly this kind of work.\n- Let them know a member of our team will contact them soon.\n- Be warm and professional, 3 to 4 sentences, no generic filler.\n- Address the lead by their first name.\nDo not invent specific prices, dates, or promises we cannot keep. Keep it general but personal.\n\n# OUTPUT FORMAT\nRespond with only a JSON object, no other text:\n{\n  \"priority\": \"Hot | Warm | Cold\",\n  \"reason\": \"one short sentence explaining why, referencing the signals you used\",\n  \"reply\": \"the personalized reply message to send to the lead\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        -32
+      ],
+      "id": "766b7f5c-51cd-4fcc-99e1-1d1cace66b81",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        304,
+        192
+      ],
+      "id": "c89a2139-1a34-440d-b611-3ec4eea8e483",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "YwSuiNOptlBtmpMQ",
+          "name": "OpenAI account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('On form submission').item.json.Email }}",
+        "subject": "=Thank you for contacting us {{ $('On form submission').item.json.Name }}!",
+        "emailType": "text",
+        "message": "={{ $json.reply }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        -32
+      ],
+      "id": "64b9939a-5663-43d4-970c-8cfb7edb7d0d",
+      "name": "Send a message",
+      "webhookId": "7bf28da9-e79b-4fbd-8f16-2bd967418063",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "wh2XQhbcNOCj5zgn",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = JSON.parse($input.first().json.output);\n\nreturn [\n  {\n    json: {\n      priority: output.priority,\n      reason: output.reason,\n      reply: output.reply\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -32
+      ],
+      "id": "20f8e56b-fb6e-4b7e-a16b-be1c3667b639",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "sendTo": "eranh112@gmail.com",
+        "subject": "A Hot lead has arrived!",
+        "message": "=Lead's details: \n\nName:{{ $('On form submission').item.json.Name }}\nCompany Name:{{ $('On form submission').item.json['Company Name'] }}\nEmail:{{ $('On form submission').item.json.Email }}\nRequest:{{ $('On form submission').item.json.Request }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        -112
+      ],
+      "id": "5b5cc14b-8047-4829-9b8b-eee895b2ed0f",
+      "name": "send to Sales Team",
+      "webhookId": "113263dd-6805-4c16-8645-36a6bf280df7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "wh2XQhbcNOCj5zgn",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b04b6d86-291b-4809-ae17-448207ea89f5",
+              "name": "More Info",
+              "value": "={{ $('On form submission').item.json['Company Name'] }}: (more details would be enriched here in production)",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1696,
+        -112
+      ],
+      "id": "61ac0589-1383-405f-a190-c6c6ad28fff0",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1kDnsqemjlrtGlkJEPaCiH8PXHLg-BvytNEIRHeJZrg8",
+          "mode": "list",
+          "cachedResultName": "Leads From Form",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1kDnsqemjlrtGlkJEPaCiH8PXHLg-BvytNEIRHeJZrg8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1kDnsqemjlrtGlkJEPaCiH8PXHLg-BvytNEIRHeJZrg8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('On form submission').item.json.Name }}",
+            "Company Name": "={{ $('On form submission').item.json['Company Name'] }}",
+            "Email": "={{ $('On form submission').item.json.Email }}",
+            "Request": "={{ $('On form submission').item.json.Request }}",
+            "More Info": "={{ $json['More Info'] }}",
+            "priority": "={{ $('Code in JavaScript').item.json.priority }}",
+            "reason": "={{ $('Code in JavaScript').item.json.reason }}",
+            "Date Recieved": "={{ $('On form submission').item.json.submittedAt }}",
+            "Status": "New",
+            "Phone Number": "={{ $('On form submission').item.json['Phone Number'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Request",
+              "displayName": "Request",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone Number",
+              "displayName": "Phone Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "More Info",
+              "displayName": "More Info",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Date Recieved",
+              "displayName": "Date Recieved",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1936,
+        0
+      ],
+      "id": "8099b81a-35f5-4726-8b5d-c145481d6c36",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g0svfFvPMUPPNlMd",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f125e7bb-f880-419e-b77c-eaf2030680a5",
+              "leftValue": "={{ $('Code in JavaScript').item.json.priority }}",
+              "rightValue": "Hot",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1024,
+        -32
+      ],
+      "id": "438f1cf8-fd52-47f1-a057-56c31bc29f79",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "76da3cb5-2da0-449c-918c-e68732557689",
+              "leftValue": "={{ $('On form submission').item.json['Company Name'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1472,
+        -16
+      ],
+      "id": "d37eece1-f609-461d-a984-f10635027360",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "content": "# LEAD INTAKE & AI SCORING\n### A new lead submits the FlowBridge form (Name, Email, Phone and Request are required, Company Name is optional). An AI agent reads the free text Request and classifies the lead as Hot, Warm or Cold based on intent, seriousness, budget hints, urgency and the size of the opportunity.\n### It also returns a short reason for the score and writes a personalized reply tailored to what the lead actually asked for.",
+        "height": 672,
+        "width": 640
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        -304
+      ],
+      "id": "1010f366-2659-43fb-ac77-4263f5e1ab9b",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## PARSE & AUTO REPLY\n### A Code node parses the AI output (priority, reason and reply) into clean fields the workflow can use. The personalized reply is then emailed to the lead automatically, so every lead gets a fast, relevant response.",
+        "height": 672,
+        "width": 400,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -304
+      ],
+      "id": "89b1138a-3437-47a5-ac3b-8fc3bdc804eb",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## ENRICH, ALERT & LOG\n### Hot leads trigger an instant email alert to the B2B sales team so they can act immediately. Each lead is enriched with a More Info field (simulated here for the demo, in production this would call a company lookup or enrichment API) and then logged to a Google Sheet with all its fields, its priority, the reason, and a status, as the single source of truth.",
+        "height": 672,
+        "width": 1184
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        976,
+        -304
+      ],
+      "id": "d7ebe65a-58f2-4863-840d-5c7587d0a3cf",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send to Sales Team": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "send to Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "700c378a-f17f-4d8e-8ae8-154843740036",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b841f95498d3b48a5fcd832e4e741fe811275e87c53b729b900a5ec88b629438"
+  },
+  "nodeGroups": [],
+  "id": "or9bN0otyAaVbCVI",
+  "tags": []
+}
